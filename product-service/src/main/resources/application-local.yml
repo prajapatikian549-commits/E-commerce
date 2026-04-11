@@ -1,0 +1,18 @@
+# Activate with: SPRING_PROFILES_ACTIVE=local
+# Default port 5433 matches Postgres.app on macOS. Override DATABASE_URL for Docker (often 5432).
+server:
+  port: 8082
+
+spring:
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5433/productsdb}
+    username: ${DATABASE_USER:postgres}
+    password: ${DATABASE_PASSWORD:root}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+    show-sql: true
