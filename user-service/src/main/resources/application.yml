@@ -1,6 +1,15 @@
 server:
   port: 8081
 
+# Same secret as api-gateway (HS256, min 32 UTF-8 bytes).
+jwt:
+  secret: "ecommerce-dev-jwt-secret-change-in-prod-min-32b!"
+  expiration-seconds: 3600
+
+logging:
+  pattern:
+    level: "%5p [${spring.application.name:},%X{correlationId:-}]"
+
 spring:
   application:
     name: user-service
@@ -32,4 +41,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,prometheus,metrics
+  metrics:
+    tags:
+      application: ${spring.application.name}

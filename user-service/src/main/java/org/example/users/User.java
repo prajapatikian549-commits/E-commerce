@@ -23,6 +23,10 @@ public class User {
     @Column(nullable = false)
     private String name;
 
+    /** BCrypt hash; nullable for legacy rows created before passwords were required. */
+    @Column(name = "password_hash")
+    private String passwordHash;
+
     @Column(nullable = false)
     private Instant createdAt = Instant.now();
 
@@ -48,6 +52,14 @@ public class User {
 
     public void setName(String name) {
         this.name = name;
+    }
+
+    public String getPasswordHash() {
+        return passwordHash;
+    }
+
+    public void setPasswordHash(String passwordHash) {
+        this.passwordHash = passwordHash;
     }
 
     public Instant getCreatedAt() {

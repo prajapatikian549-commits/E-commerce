@@ -15,9 +15,11 @@ import org.springframework.web.server.ResponseStatusException;
 public class InternalStockController {
 
     private final ProductRepository productRepository;
+    private final ProductCacheEviction productCacheEviction;
 
-    public InternalStockController(ProductRepository productRepository) {
+    public InternalStockController(ProductRepository productRepository, ProductCacheEviction productCacheEviction) {
         this.productRepository = productRepository;
+        this.productCacheEviction = productCacheEviction;
     }
 
     @PostMapping("/{id}/reserve")
@@ -29,7 +31,9 @@ public class InternalStockController {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Insufficient stock");
         }
         p.setStock(p.getStock() - body.quantity());
-        return ProductResponse.from(productRepository.save(p));
+        ProductResponse saved = ProductResponse.from(productRepository.save(p));
+        productCacheEviction.evictAll();
+        return saved;
     }
 
     @PostMapping("/{id}/release")
@@ -38,6 +42,8 @@ public class InternalStockController {
         Product p = productRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found"));
         p.setStock(p.getStock() + body.quantity());
-        return ProductResponse.from(productRepository.save(p));
+        ProductResponse saved = ProductResponse.from(productRepository.save(p));
+        productCacheEviction.evictAll();
+        return saved;
     }
 }

@@ -1,9 +1,27 @@
 server:
   port: 8084
 
+# Match order-service when using Kafka-based notifications.
+app:
+  notification:
+    use-kafka: false
+  kafka:
+    order-events-topic: order-events
+
+logging:
+  pattern:
+    level: "%5p [${spring.application.name:},%X{correlationId:-}]"
+
 spring:
   application:
     name: notification-service
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: notification-service
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      auto-offset-reset: earliest
 
 eureka:
   client:
@@ -17,4 +35,10 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,prometheus,metrics
+  health:
+    kafka:
+      enabled: false
+  metrics:
+    tags:
+      application: ${spring.application.name}

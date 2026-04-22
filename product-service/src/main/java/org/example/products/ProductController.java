@@ -20,21 +20,27 @@ import java.util.List;
 public class ProductController {
 
     private final ProductRepository productRepository;
+    private final ProductCatalogService productCatalogService;
+    private final ProductCacheEviction productCacheEviction;
 
-    public ProductController(ProductRepository productRepository) {
+    public ProductController(
+            ProductRepository productRepository,
+            ProductCatalogService productCatalogService,
+            ProductCacheEviction productCacheEviction
+    ) {
         this.productRepository = productRepository;
+        this.productCatalogService = productCatalogService;
+        this.productCacheEviction = productCacheEviction;
     }
 
     @GetMapping
     public List<ProductResponse> list() {
-        return productRepository.findAll().stream().map(ProductResponse::from).toList();
+        return productCatalogService.listAll();
     }
 
     @GetMapping("/{id}")
     public ProductResponse get(@PathVariable Long id) {
-        return productRepository.findById(id)
-                .map(ProductResponse::from)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        return productCatalogService.getById(id);
     }
 
     @PostMapping
@@ -45,7 +51,9 @@ public class ProductController {
         p.setDescription(request.description());
         p.setPrice(request.price());
         p.setStock(request.stock());
-        return ProductResponse.from(productRepository.save(p));
+        ProductResponse saved = ProductResponse.from(productRepository.save(p));
+        productCacheEviction.evictAll();
+        return saved;
     }
 
     @PutMapping("/{id}")
@@ -56,7 +64,9 @@ public class ProductController {
         p.setDescription(request.description());
         p.setPrice(request.price());
         p.setStock(request.stock());
-        return ProductResponse.from(productRepository.save(p));
+        ProductResponse saved = ProductResponse.from(productRepository.save(p));
+        productCacheEviction.evictAll();
+        return saved;
     }
 
     @DeleteMapping("/{id}")
@@ -66,5 +76,6 @@ public class ProductController {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND);
         }
         productRepository.deleteById(id);
+        productCacheEviction.evictAll();
     }
 }

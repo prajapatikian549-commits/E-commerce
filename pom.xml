@@ -19,6 +19,7 @@
     <description>E-commerce microservices MVP</description>
 
     <modules>
+        <module>ecommerce-common</module>
         <module>eureka-server</module>
         <module>api-gateway</module>
         <module>user-service</module>

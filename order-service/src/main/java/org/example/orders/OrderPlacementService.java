@@ -1,6 +1,7 @@
 package org.example.orders;
 
 import feign.FeignException;
+import org.springframework.cloud.client.circuitbreaker.NoFallbackAvailableException;
 import org.example.orders.client.NotificationBodyDto;
 import org.example.orders.client.NotificationClient;
 import org.example.orders.client.PaymentBodyDto;
@@ -10,8 +11,10 @@ import org.example.orders.client.ProductClient;
 import org.example.orders.client.ProductDto;
 import org.example.orders.client.QuantityDto;
 import org.example.orders.client.UserClient;
+import org.example.orders.events.OrderEventPublisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -30,31 +33,40 @@ public class OrderPlacementService {
     private final PaymentClient paymentClient;
     private final NotificationClient notificationClient;
     private final OrderRepository orderRepository;
+    private final OrderEventPublisher orderEventPublisher;
+    private final boolean useKafkaForNotification;
 
     public OrderPlacementService(
             UserClient userClient,
             ProductClient productClient,
             PaymentClient paymentClient,
             NotificationClient notificationClient,
-            OrderRepository orderRepository
+            OrderRepository orderRepository,
+            OrderEventPublisher orderEventPublisher,
+            @Value("${app.notification.use-kafka:false}") boolean useKafkaForNotification
     ) {
         this.userClient = userClient;
         this.productClient = productClient;
         this.paymentClient = paymentClient;
         this.notificationClient = notificationClient;
         this.orderRepository = orderRepository;
+        this.orderEventPublisher = orderEventPublisher;
+        this.useKafkaForNotification = useKafkaForNotification;
     }
 
     public OrderResponse placeOrder(CreateOrderRequest request) {
-        userClient.getUser(request.userId());
-
         BigDecimal total = BigDecimal.ZERO;
         List<LineBuild> lines = new ArrayList<>();
-        for (OrderLineItem item : request.items()) {
-            ProductDto product = productClient.getProduct(item.productId());
-            BigDecimal lineTotal = product.price().multiply(BigDecimal.valueOf(item.quantity()));
-            total = total.add(lineTotal);
-            lines.add(new LineBuild(item.productId(), item.quantity(), product.price()));
+        try {
+            userClient.getUser(request.userId());
+            for (OrderLineItem item : request.items()) {
+                ProductDto product = productClient.getProduct(item.productId());
+                BigDecimal lineTotal = product.price().multiply(BigDecimal.valueOf(item.quantity()));
+                total = total.add(lineTotal);
+                lines.add(new LineBuild(item.productId(), item.quantity(), product.price()));
+            }
+        } catch (FeignException | NoFallbackAvailableException e) {
+            throw mapDependencyFailureToHttp(e, "User or product not found — check userId and productId exist in user-service and product-service.");
         }
 
         OrderEntity order = new OrderEntity();
@@ -77,6 +89,9 @@ public class OrderPlacementService {
                 reserved.add(new ReservedItem(b.productId(), b.quantity()));
             }
 
+            order.setStatus(OrderStatus.INVENTORY_RESERVED);
+            orderRepository.save(order);
+
             boolean fail = Boolean.TRUE.equals(request.failPayment());
             PaymentResultDto payResult = paymentClient.pay(new PaymentBodyDto(order.getId(), total), fail);
             if (!"SUCCESS".equals(payResult.status())) {
@@ -86,27 +101,28 @@ public class OrderPlacementService {
             order.setStatus(OrderStatus.CONFIRMED);
             orderRepository.save(order);
 
-            try {
-                notificationClient.notify(new NotificationBodyDto(order.getId(), "ORDER_CONFIRMED"));
-            } catch (Exception e) {
-                log.warn("Notification failed for order {}", order.getId(), e);
+            if (useKafkaForNotification) {
+                orderEventPublisher.publishOrderConfirmed(order.getId());
+            } else {
+                try {
+                    notificationClient.notify(new NotificationBodyDto(order.getId(), "ORDER_CONFIRMED"));
+                } catch (Exception e) {
+                    log.warn("Notification failed for order {}", order.getId(), e);
+                }
             }
 
-            return OrderResponse.from(order);
+            return orderRepository.findWithLinesById(order.getId())
+                    .map(OrderResponse::from)
+                    .orElseThrow(() -> new ResponseStatusException(
+                            HttpStatus.INTERNAL_SERVER_ERROR, "Order not found after successful placement"));
         } catch (ResponseStatusException e) {
             compensate(reserved);
             markFailed(order);
             throw e;
-        } catch (FeignException e) {
+        } catch (FeignException | NoFallbackAvailableException e) {
             compensate(reserved);
             markFailed(order);
-            if (e.status() == 404) {
-                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Resource not found", e);
-            }
-            HttpStatus status = e.status() >= 400 && e.status() < 500
-                    ? HttpStatus.BAD_REQUEST
-                    : HttpStatus.BAD_GATEWAY;
-            throw new ResponseStatusException(status, "Dependency call failed", e);
+            throw mapDependencyFailureToHttp(e, "Dependency call failed");
         } catch (Exception e) {
             compensate(reserved);
             markFailed(order);
@@ -117,6 +133,35 @@ public class OrderPlacementService {
     private void markFailed(OrderEntity order) {
         order.setStatus(OrderStatus.FAILED);
         orderRepository.save(order);
+    }
+
+    /**
+     * Circuit breaker wraps failed Feign calls as {@link NoFallbackAvailableException}; unwrap to
+     * {@link FeignException} for status-based HTTP mapping.
+     */
+    private static FeignException unwrapFeign(Throwable throwable) {
+        Throwable t = throwable;
+        while (t != null) {
+            if (t instanceof FeignException fe) {
+                return fe;
+            }
+            t = t.getCause();
+        }
+        return null;
+    }
+
+    private static ResponseStatusException mapDependencyFailureToHttp(Throwable e, String fallbackMessage) {
+        FeignException fe = unwrapFeign(e);
+        if (fe != null) {
+            if (fe.status() == 404) {
+                return new ResponseStatusException(HttpStatus.NOT_FOUND, fallbackMessage, fe);
+            }
+            HttpStatus status = fe.status() >= 400 && fe.status() < 500
+                    ? HttpStatus.BAD_REQUEST
+                    : HttpStatus.BAD_GATEWAY;
+            return new ResponseStatusException(status, "Dependency call failed", fe);
+        }
+        return new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, e.getMessage(), e);
     }
 
     private void compensate(List<ReservedItem> reserved) {

@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.List;
 
@@ -20,9 +21,11 @@ import java.util.List;
 public class UserController {
 
     private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
 
-    public UserController(UserRepository userRepository) {
+    public UserController(UserRepository userRepository, PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
+        this.passwordEncoder = passwordEncoder;
     }
 
     @GetMapping
@@ -41,8 +44,12 @@ public class UserController {
     @ResponseStatus(HttpStatus.CREATED)
     public UserResponse create(@Valid @RequestBody UserRequest request) {
         User user = new User();
-        user.setEmail(request.email());
+        user.setEmail(request.email().trim().toLowerCase());
         user.setName(request.name());
+        String rawPassword = (request.password() != null && !request.password().isBlank())
+                ? request.password()
+                : "password";
+        user.setPasswordHash(passwordEncoder.encode(rawPassword));
         return UserResponse.from(userRepository.save(user));
     }
 
@@ -50,8 +57,11 @@ public class UserController {
     public UserResponse update(@PathVariable Long id, @Valid @RequestBody UserRequest request) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-        user.setEmail(request.email());
+        user.setEmail(request.email().trim().toLowerCase());
         user.setName(request.name());
+        if (request.password() != null && !request.password().isBlank()) {
+            user.setPasswordHash(passwordEncoder.encode(request.password()));
+        }
         return UserResponse.from(userRepository.save(user));
     }
 

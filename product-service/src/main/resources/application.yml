@@ -1,9 +1,21 @@
 server:
   port: 8082
 
+logging:
+  pattern:
+    level: "%5p [${spring.application.name:},%X{correlationId:-}]"
+
 spring:
   application:
     name: product-service
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+  cache:
+    type: redis
+    redis:
+      time-to-live: 10m
   datasource:
     url: jdbc:h2:mem:productsdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
     driver-class-name: org.h2.Driver
@@ -28,4 +40,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,prometheus,metrics
+  metrics:
+    tags:
+      application: ${spring.application.name}

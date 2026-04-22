@@ -1,12 +1,35 @@
 server:
   port: 8080
 
+# Must match user-service token signing secret (HS256, min 32 UTF-8 bytes).
+jwt:
+  secret: "ecommerce-dev-jwt-secret-change-in-prod-min-32b!"
+
 spring:
   application:
     name: api-gateway
   cloud:
     gateway:
+      # Lets the UI call the gateway directly (e.g. VITE_API_BASE=http://127.0.0.1:8080) without the Vite proxy.
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            allowedOriginPatterns:
+              - 'http://localhost:*'
+              - 'http://127.0.0.1:*'
+            allowedMethods:
+              - GET
+              - POST
+              - PUT
+              - PATCH
+              - DELETE
+              - OPTIONS
+            allowedHeaders: '*'
       routes:
+        - id: user-service-auth
+          uri: lb://user-service
+          predicates:
+            - Path=/api/auth/**
         - id: user-service
           uri: lb://user-service
           predicates:
@@ -28,8 +51,21 @@ eureka:
     hostname: localhost
     prefer-ip-address: false
 
+logging:
+  pattern:
+    level: "%5p [${spring.application.name:},%X{correlationId:-}]"
+  level:
+    org.springframework.security: DEBUG
+    org.springframework.security.oauth2: DEBUG
+
 management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      show-details: when_authorized
+  metrics:
+    tags:
+      application: ${spring.application.name}
