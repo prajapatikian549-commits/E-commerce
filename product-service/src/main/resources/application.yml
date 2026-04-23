@@ -14,7 +14,8 @@ spring:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
   cache:
-    type: redis
+    # Use SPRING_CACHE_TYPE=simple on Render when Redis is not provisioned yet.
+    type: ${SPRING_CACHE_TYPE:redis}
     redis:
       time-to-live: 10m
   datasource:

@@ -1,0 +1,11 @@
+# Activated on Render via SPRING_PROFILES_ACTIVE=render (no Redis/Eureka in that environment).
+spring:
+  cache:
+    type: simple
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
+
+eureka:
+  client:
+    enabled: false
