@@ -8,6 +8,8 @@ logging:
 spring:
   application:
     name: payment-service
+  config:
+    import: optional:classpath:tracing-common.yml
 
 eureka:
   client:

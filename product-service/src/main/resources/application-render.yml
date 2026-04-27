@@ -1,4 +1,9 @@
 # Activated on Render via SPRING_PROFILES_ACTIVE=render (no Redis/Eureka in that environment).
+# No Zipkin in the container: avoid failed span export to localhost:9411
+management:
+  tracing:
+    enabled: false
+
 spring:
   cache:
     type: simple

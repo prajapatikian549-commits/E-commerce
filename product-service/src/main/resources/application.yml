@@ -9,6 +9,8 @@ logging:
 spring:
   application:
     name: product-service
+  config:
+    import: optional:classpath:tracing-common.yml
   data:
     redis:
       host: ${REDIS_HOST:localhost}

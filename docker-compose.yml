@@ -4,8 +4,16 @@
 #
 # DBeaver: host localhost, port 5432, user/password from environment below.
 # Databases: usersdb, productsdb, ordersdb
+#
+# Zipkin UI for distributed traces (Micrometer → Brave): http://localhost:9411
 
 services:
+  zipkin:
+    image: openzipkin/zipkin:3
+    container_name: ecommerce-zipkin
+    ports:
+      - "9411:9411"
+
   redis:
     image: redis:7-alpine
     container_name: ecommerce-redis

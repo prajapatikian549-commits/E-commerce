@@ -1,0 +1,13 @@
+# Shared Micrometer + Brave tracing (imported from each service).
+# Default: tracing export OFF so local runs without Docker don't spam Zipkin connection errors.
+# To send spans to Zipkin: 1) docker compose up -d zipkin
+# 2) Set env MANAGEMENT_TRACING_ENABLED=true (e.g. IntelliJ Run → Environment variables).
+# Zipkin UI: http://localhost:9411
+management:
+  tracing:
+    enabled: ${MANAGEMENT_TRACING_ENABLED:false}
+    sampling:
+      probability: ${TRACE_SAMPLE_PROBABILITY:1.0}
+  zipkin:
+    tracing:
+      endpoint: ${ZIPKIN_ENDPOINT:http://127.0.0.1:9411/api/v2/spans}

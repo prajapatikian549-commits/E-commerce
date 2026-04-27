@@ -8,6 +8,8 @@ jwt:
 spring:
   application:
     name: api-gateway
+  config:
+    import: optional:classpath:tracing-common.yml
   cloud:
     gateway:
       # Lets the UI call the gateway directly (e.g. VITE_API_BASE=http://127.0.0.1:8080) without the Vite proxy.

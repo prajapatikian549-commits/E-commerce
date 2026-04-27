@@ -15,6 +15,8 @@ logging:
 spring:
   application:
     name: notification-service
+  config:
+    import: optional:classpath:tracing-common.yml
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     consumer:
