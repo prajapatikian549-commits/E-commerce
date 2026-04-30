@@ -1,0 +1,58 @@
+server:
+  port: 8096
+
+logging:
+  pattern:
+    level: "%5p [${spring.application.name:},%X{correlationId:-}]"
+  level:
+    org.example.chatbot: INFO
+
+spring:
+  application:
+    name: chatbot-service
+  config:
+    import: optional:classpath:tracing-common.yml
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+  instance:
+    hostname: localhost
+    prefer-ip-address: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      show-details: when_authorized
+
+chatbot:
+  fallback-message: "Our assistant is temporarily unavailable. Please try again in a moment."
+  system-prompt: >-
+    You are a concise, friendly e-commerce store assistant.
+    If you do not know something, say so briefly. Do not invent order numbers or prices.
+  ollama:
+    base-url: http://localhost:11434
+    generate-path: /api/generate
+    model: llama3
+    connect-timeout-ms: 2000
+    read-timeout-ms: 120000
+    enabled: true
+  retry:
+    max-attempts: 3
+    wait-ms: 500
+  gemini:
+    enabled: false
+    base-url: https://generativelanguage.googleapis.com
+    model: gemini-1.5-flash
+    api-key: ${GEMINI_API_KEY:}
+    connect-timeout-ms: 3000
+    read-timeout-ms: 60000
+  faq:
+    shipping: "Standard shipping takes 3–5 business days. Express options may be available at checkout."
+    returns: "Items can be returned within 30 days if unused and in original packaging. Refunds process in 5–10 business days."
+    payment: "We accept major cards and digital wallets. Charges appear at order confirmation."

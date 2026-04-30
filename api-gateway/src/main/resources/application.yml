@@ -44,6 +44,10 @@ spring:
           uri: lb://order-service
           predicates:
             - Path=/api/orders/**
+        - id: chatbot-service
+          uri: lb://chatbot-service
+          predicates:
+            - Path=/api/chat/**
 
 eureka:
   client:
