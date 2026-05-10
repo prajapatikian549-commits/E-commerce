@@ -10,21 +10,25 @@ import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSeriali
 import org.springframework.data.redis.serializer.RedisSerializationContext;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 
-/**
- * Default Redis cache uses JDK serialization, which requires {@link java.io.Serializable} types.
- * Cached values are {@link org.example.products.ProductResponse} DTOs — use JSON instead.
- */
 @Configuration
 @ConditionalOnProperty(name = "spring.cache.type", havingValue = "redis")
 public class RedisCacheConfig {
 
     @Bean
-    public RedisCacheManagerBuilderCustomizer redisCacheManagerBuilderCustomizer(ObjectMapper objectMapper) {
+    public RedisCacheManagerBuilderCustomizer redisCacheManagerBuilderCustomizer(
+            ObjectMapper objectMapper) {
+
+        GenericJackson2JsonRedisSerializer serializer =
+                new GenericJackson2JsonRedisSerializer(objectMapper);
+
         return builder -> builder.cacheDefaults(
                 RedisCacheConfiguration.defaultCacheConfig()
                         .serializeKeysWith(
-                                RedisSerializationContext.SerializationPair.fromSerializer(new StringRedisSerializer()))
-                        .serializeValuesWith(RedisSerializationContext.SerializationPair.fromSerializer(
-                                new GenericJackson2JsonRedisSerializer(objectMapper))));
+                                RedisSerializationContext.SerializationPair
+                                        .fromSerializer(new StringRedisSerializer()))
+                        .serializeValuesWith(
+                                RedisSerializationContext.SerializationPair
+                                        .fromSerializer(serializer))
+        );
     }
 }
